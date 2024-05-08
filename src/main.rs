@@ -1,10 +1,18 @@
+use std::iter::zip;
+
 use rand::Rng;
 
-#[derive(Default, Clone, Copy, Debug)]
+#[derive(Default, Clone, Copy, Debug, PartialEq, PartialOrd)]
 struct Cell {
     letter: char,
     x: usize,
     y: usize,
+}
+
+impl Cell {
+    fn coords(&self) -> (usize, usize) {
+        (self.x, self.y)
+    }
 }
 
 struct Board(Vec<Vec<Cell>>);
@@ -47,7 +55,7 @@ impl Board {
 
         if let Some(row) = self.0.get(y as usize) {
             if let Some(cell) = row.get(x as usize) {
-                if cell.letter != char::default() {
+                if cell.letter == char::default() {
                     return Some(cell);
                 }
             }
@@ -56,33 +64,51 @@ impl Board {
         None
     }
 
-    fn mutate_cell_letter(&mut self, x: usize, y: usize, letter: char) {
-        self.0[y][x].letter = letter;
+    fn get_next_random_cell(&self, x: usize, y: usize) -> Option<&Cell> {
+        let mut rng = rand::thread_rng();
+
+        for _ in 0..9 {
+            let x_offset: i32 = rng.gen_range(-1..=1);
+            let y_offset: i32 = rng.gen_range(-1..=1);
+
+            let x = (x as i32) + x_offset;
+            let y = (y as i32) + y_offset;
+
+            if let Some(cell) = self.valid_cell(x, y) {
+                return Some(cell);
+            }
+        }
+
+        panic!("No valid cell found");
     }
 
     fn place_word(&mut self, word: &str) {
-        let mut rng = rand::thread_rng();
-
         let mut current_cell = self.0
             .iter()
             .flatten()
             .find(|&&cell| cell.letter == char::default())
             .unwrap();
 
+        let mut positions: Vec<(usize, usize)> = Vec::new();
+
         for char in word.chars() {
-            loop {
-                let x_offset: i32 = rng.gen_range(-1..=1);
-                let y_offset: i32 = rng.gen_range(-1..=1);
-
-                let x = (current_cell.x as i32) + x_offset;
-                let y = (current_cell.y as i32) + y_offset;
-
-                if let Some(cell) = self.valid_cell(x, y) {
-                    self.mutate_cell_letter(x, y, cel);
-                    current_cell = cell;
-                    break;
-                }
+            while positions.contains(&current_cell.coords()) {
+                current_cell = self.get_next_random_cell(current_cell.x, current_cell.y).unwrap();
             }
+
+            let new_cell = Cell {
+                letter: char,
+                ..*current_cell
+            };
+
+            positions.push(new_cell.coords());
+        }
+
+        for (coords, letter) in zip(positions, word.chars()) {
+            let (x, y) = coords;
+            self.0[y][x].letter = letter;
+            self.print();
+            std::thread::sleep(std::time::Duration::from_millis(100));
         }
     }
 }
@@ -93,7 +119,16 @@ fn main() {
 
     board.print();
 
-    board.place_word(words[0]);
+    let mut sum = 0;
+    for word in words.iter() {
+        sum += word.len();
+    }
+    println!("Sum of word lengths: {}", sum);
+
+    for word in words.iter() {
+        board.place_word(word);
+        board.print();
+    }
 
     board.print();
 }
